@@ -52,8 +52,6 @@ abstract class XukeTask : DefaultTask() {
     @get:OutputFile
     abstract val outputFileProp: RegularFileProperty
 
-    private val documentFactory = DocumentBuilderFactory.newInstance()
-
     @TaskAction
     fun collect() {
         val licenseData = extractLicenses(artifacts.get())
@@ -101,7 +99,7 @@ abstract class XukeTask : DefaultTask() {
 
     @OptIn(ExperimentalStdlibApi::class)
     private fun extractLicenses(pomFile: File): List<License> = buildList {
-        val pomDoc = documentFactory.newDocumentBuilder().parse(pomFile).documentElement
+        val pomDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(pomFile).documentElement
         val licenseNodes = pomDoc.getElementsByTagName("licenses").singleOrNull()?.childNodes
         licenseNodes?.forEach { licenseNode ->
             if (licenseNode.nodeType == Node.ELEMENT_NODE) {
