@@ -5,7 +5,7 @@ plugins {
 }
 
 dependencies {
-    implementation(gradleApi())
+    compileOnly(gradleApi())
 
     testImplementation(TestingLib.JUNIT)
 }
