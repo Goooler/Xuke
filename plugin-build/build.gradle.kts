@@ -5,9 +5,7 @@ plugins {
 }
 
 allprojects {
-    apply {
-        plugin("org.jlleitschuh.gradle.ktlint")
-    }
+    pluginManager.apply(rootProject.libs.plugins.ktlint.get().pluginId)
 
     ktlint {
         debug.set(false)
