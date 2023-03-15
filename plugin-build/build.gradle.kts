@@ -1,17 +1,12 @@
 plugins {
-    kotlin("jvm") version BuildPluginsVersion.KOTLIN apply false
-    id("com.gradle.plugin-publish") version BuildPluginsVersion.PLUGIN_PUBLISH apply false
-    id("org.jlleitschuh.gradle.ktlint") version BuildPluginsVersion.KTLINT
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.pluginPublish)
 }
 
 allprojects {
     group = PluginCoordinates.GROUP
     version = PluginCoordinates.VERSION
-
-    repositories {
-        google()
-        mavenCentral()
-    }
 
     apply {
         plugin("org.jlleitschuh.gradle.ktlint")
@@ -29,8 +24,4 @@ allprojects {
             include("**/kotlin/**")
         }
     }
-}
-
-tasks.register("clean", Delete::class.java) {
-    delete(rootProject.buildDir)
 }

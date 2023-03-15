@@ -7,7 +7,7 @@ plugins {
 dependencies {
     compileOnly(gradleApi())
 
-    testImplementation(TestingLib.JUNIT)
+    testImplementation(libs.junit4)
 }
 
 java {
