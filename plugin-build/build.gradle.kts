@@ -5,9 +5,6 @@ plugins {
 }
 
 allprojects {
-    group = PluginCoordinates.GROUP
-    version = PluginCoordinates.VERSION
-
     apply {
         plugin("org.jlleitschuh.gradle.ktlint")
     }
