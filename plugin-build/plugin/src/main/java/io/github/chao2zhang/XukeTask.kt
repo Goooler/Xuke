@@ -9,8 +9,6 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.gradle.api.DefaultTask
 import org.gradle.api.Project
-import org.gradle.api.artifacts.ResolvedArtifact
-import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
@@ -24,12 +22,12 @@ import org.gradle.maven.MavenPomArtifact
 import org.w3c.dom.Node
 
 abstract class XukeTask : DefaultTask() {
-    private val artifacts: Provider<List<ResolvedArtifact>>
+    private val deps: Provider<List<Dependency>>
 
     init {
         description = "Collect software licenses from dependencies"
 
-        artifacts = project.provider {
+        deps = project.provider {
             project
                 .configurations
                 .filter { configuration ->
@@ -39,6 +37,13 @@ abstract class XukeTask : DefaultTask() {
                 .filter { it.isCanBeResolved }
                 .flatMap { configuration ->
                     configuration.resolvedConfiguration.resolvedArtifacts
+                }
+                .map {
+                    Dependency(
+                        it.moduleVersion.id.group,
+                        it.moduleVersion.id.name,
+                        it.moduleVersion.id.version,
+                    )
                 }
         }
     }
@@ -54,20 +59,14 @@ abstract class XukeTask : DefaultTask() {
 
     @TaskAction
     fun collect() {
-        val licenseData = extractLicenses(artifacts.get())
+        val licenseData = extractLicenses(deps.get())
         writeLicenses(licenseData)
     }
 
-    private fun extractLicenses(artifacts: List<ResolvedArtifact>): LicenseData = artifacts
-        .associate { resolvedArtifact ->
-            val componentIdentifier = resolvedArtifact.id.componentIdentifier
-            val pom = queryPom(project, componentIdentifier)
-            Dependency(
-                group = resolvedArtifact.moduleVersion.id.group,
-                name = resolvedArtifact.moduleVersion.id.name,
-                version = resolvedArtifact.moduleVersion.id.version,
-            ) to (pom?.let(::extractLicenses) ?: emptyList())
-        }
+    private fun extractLicenses(deps: List<Dependency>): LicenseData = deps.associateWith { dep ->
+        val pom = queryPom(project, dep)
+        (pom?.let(::extractLicenses) ?: emptyList())
+    }
 
     private fun writeLicenses(licenseData: LicenseData) {
         val outputFile = outputFileProp.get().asFile
@@ -84,10 +83,10 @@ abstract class XukeTask : DefaultTask() {
         logger.info(licenseData.toList().joinToString(separator = "\n"))
     }
 
-    private fun queryPom(project: Project, componentIdentifier: ComponentIdentifier): File? =
+    private fun queryPom(project: Project, dep: Dependency): File? =
         project.dependencies
             .createArtifactResolutionQuery()
-            .forComponents(componentIdentifier)
+            .forModule(dep.group, dep.name, dep.version)
             .withArtifacts(MavenModule::class.java, MavenPomArtifact::class.java)
             .execute()
             .resolvedComponents
