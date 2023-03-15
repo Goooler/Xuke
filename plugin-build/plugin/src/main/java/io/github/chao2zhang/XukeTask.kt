@@ -5,6 +5,8 @@ import io.github.chao2zhang.api.License
 import io.github.chao2zhang.api.LicenseData
 import io.github.chao2zhang.format.FormatOptions
 import io.github.chao2zhang.format.FormatterFactory
+import java.io.File
+import javax.xml.parsers.DocumentBuilderFactory
 import org.gradle.api.DefaultTask
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ResolvedArtifact
@@ -13,19 +15,32 @@ import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.maven.MavenModule
 import org.gradle.maven.MavenPomArtifact
 import org.w3c.dom.Node
-import java.io.File
-import javax.xml.parsers.DocumentBuilderFactory
 
 abstract class XukeTask : DefaultTask() {
+    private val artifacts: Provider<List<ResolvedArtifact>>
 
     init {
         description = "Collect software licenses from dependencies"
+
+        artifacts = project.provider {
+            project
+                .configurations
+                .filter { configuration ->
+                    val buildConfigurations = buildConfigurationsProp.getOrElse(emptyList<String>())
+                    if (buildConfigurations.isEmpty()) true else configuration.name in buildConfigurations
+                }
+                .filter { it.isCanBeResolved }
+                .flatMap { configuration ->
+                    configuration.resolvedConfiguration.resolvedArtifacts
+                }
+        }
     }
 
     @get:Input
@@ -41,21 +56,9 @@ abstract class XukeTask : DefaultTask() {
 
     @TaskAction
     fun collect() {
-        val artifacts = getArtifacts()
-        val licenseData = extractLicenses(artifacts)
+        val licenseData = extractLicenses(artifacts.get())
         writeLicenses(licenseData)
     }
-
-    private fun getArtifacts(): List<ResolvedArtifact> = project
-        .configurations
-        .filter { configuration ->
-            val buildConfigurations = buildConfigurationsProp.getOrElse(emptyList<String>())
-            if (buildConfigurations.isEmpty()) true else configuration.name in buildConfigurations
-        }
-        .filter { it.isCanBeResolved }
-        .flatMap { configuration ->
-            configuration.resolvedConfiguration.resolvedArtifacts
-        }
 
     private fun extractLicenses(artifacts: List<ResolvedArtifact>): LicenseData = artifacts
         .associate { resolvedArtifact ->
@@ -64,7 +67,7 @@ abstract class XukeTask : DefaultTask() {
             Dependency(
                 group = resolvedArtifact.moduleVersion.id.group,
                 name = resolvedArtifact.moduleVersion.id.name,
-                version = resolvedArtifact.moduleVersion.id.version
+                version = resolvedArtifact.moduleVersion.id.version,
             ) to (pom?.let(::extractLicenses) ?: emptyList())
         }
 
@@ -76,9 +79,9 @@ abstract class XukeTask : DefaultTask() {
                 .format(
                     licenseData,
                     FormatOptions(
-                        packagePath = outputPackage.getOrElse("")
-                    )
-                )
+                        packagePath = outputPackage.getOrElse(""),
+                    ),
+                ),
         )
         logger.info(licenseData.toList().joinToString(separator = "\n"))
     }
@@ -107,8 +110,8 @@ abstract class XukeTask : DefaultTask() {
                         name = licenseNode.namedChildTextContentOrEmpty("name"),
                         url = licenseNode.namedChildTextContentOrEmpty("url"),
                         distribution = licenseNode.namedChildTextContentOrEmpty("distribution"),
-                        comments = licenseNode.namedChildTextContentOrEmpty("comments")
-                    )
+                        comments = licenseNode.namedChildTextContentOrEmpty("comments"),
+                    ),
                 )
             }
         }
